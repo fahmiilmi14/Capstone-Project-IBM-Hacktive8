@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jakarta Air Quality Dashboard — DKI1 Bunderan HI</title>
+
+  <!-- Favicon: inline SVG air quality icon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d4ed8'/%3E%3Cpath d='M6 20c2-4 4-6 10-6s8 2 10 6' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3Cpath d='M4 24c3-5 5-7 12-7s9 2 12 7' stroke='%2393c5fd' stroke-width='1.8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.441.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- ══════════════════════════════════════════════
+       SIDEBAR + MAIN LAYOUT WRAPPER
+  ══════════════════════════════════════════════ -->
+  <div class="dashboard-layout">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>
+            <path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>
+            <path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+          </svg>
+        </div>
+        <div>
+          <span class="brand-name">AirWatch</span>
+          <span class="brand-sub">DKI Jakarta</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <span class="nav-group-label">Navigasi</span>
+        <a href="#section-kpi" class="nav-item active">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <span>Overview</span>
+        </a>
+        <a href="#section-trend" class="nav-item">
+          <i data-lucide="trending-up" class="nav-icon"></i>
+          <span>Tren ISPU</span>
+        </a>
+        <a href="#section-charts2" class="nav-item">
+          <i data-lucide="bar-chart-2" class="nav-icon"></i>
+          <span>Polutan</span>
+        </a>
+        <a href="#section-table" class="nav-item">
+          <i data-lucide="table-2" class="nav-icon"></i>
+          <span>Top 10</span>
+        </a>
+        <a href="#section-insight" class="nav-item">
+          <i data-lucide="brain-circuit" class="nav-icon"></i>
+          <span>Insight</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-info">
+          <i data-lucide="map-pin" class="sidebar-footer-icon"></i>
+          <div>
+            <p class="sidebar-footer-title">Stasiun DKI1</p>
+            <p class="sidebar-footer-sub">Bunderan HI · 2010–2025</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ── -->
+    <div class="main-content">
+
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            <i data-lucide="menu" width="18" height="18"></i>
+          </button>
+          <div>
+            <h1 class="topbar-title">Jakarta Air Quality Insight Dashboard</h1>
+            <p class="topbar-sub">Indeks Standar Pencemar Udara (ISPU) · Real-time dari dataset CSV</p>
+          </div>
+        </div>
+        <div id="data-status" class="status-badge status-loading">
+          <i data-lucide="loader-2" class="status-icon spin-icon" width="12" height="12"></i>
+          <span>Memuat data…</span>
+        </div>
+      </header>
+
+      <main class="page-body">
+
+        <!-- ══ FILTERS ══ -->
+        <section class="filter-section">
+          <div class="section-header">
+            <i data-lucide="sliders-horizontal" class="section-icon"></i>
+            <h2 class="section-title">Filter Data</h2>
+          </div>
+          <div class="filter-grid">
+            <div class="filter-field">
+              <label class="filter-label">
+                <i data-lucide="calendar" width="12" height="12"></i>
+                Tahun Mulai
+              </label>
+              <select id="filter-year-start" class="filter-select"></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">
+                <i data-lucide="calendar-check" width="12" height="12"></i>
+                Tahun Akhir
+              </label>
+              <select id="filter-year-end" class="filter-select"></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">
+                <i data-lucide="shield-check" width="12" height="12"></i>
+                Kategori Kualitas
+              </label>
+              <select id="filter-category" class="filter-select">
+                <option value="ALL">Semua Kategori</option>
+                <option value="BAIK">BAIK</option>
+                <option value="SEDANG">SEDANG</option>
+                <option value="TIDAK SEHAT">TIDAK SEHAT</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label">
+                <i data-lucide="wind" width="12" height="12"></i>
+                Polutan Kritis
+              </label>
+              <select id="filter-critical" class="filter-select">
+                <option value="ALL">Semua Polutan</option>
+                <option value="PM25">PM2.5</option>
+                <option value="PM10">PM10</option>
+                <option value="O3">O3</option>
+                <option value="CO">CO</option>
+                <option value="SO2">SO2</option>
+                <option value="NO2">NO2</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-footer">
+            <button id="btn-reset" class="btn-reset">
+              <i data-lucide="rotate-ccw" width="13" height="13"></i>
+              Reset Filter
+            </button>
+            <span id="filter-summary" class="filter-summary-text"></span>
+          </div>
+        </section>
+
+        <!-- ══ KPI CARDS ══ -->
+        <section id="section-kpi">
+          <div class="section-header">
+            <i data-lucide="layout-dashboard" class="section-icon"></i>
+            <h2 class="section-title">Indikator Utama</h2>
+          </div>
+          <div class="kpi-grid">
+
+            <div class="kpi-card kpi-blue">
+              <div class="kpi-icon-wrap kpi-icon-blue">
+                <i data-lucide="calendar-days" width="20" height="20"></i>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Total Hari Valid</p>
+                <p id="kpi-total-days" class="kpi-value">—</p>
+                <p class="kpi-sub">hari data tervalidasi</p>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-indigo">
+              <div class="kpi-icon-wrap kpi-icon-indigo">
+                <i data-lucide="activity" width="20" height="20"></i>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Rata-rata ISPU Maks</p>
+                <p id="kpi-avg-max" class="kpi-value">—</p>
+                <p class="kpi-sub">indeks rata-rata harian</p>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-red">
+              <div class="kpi-icon-wrap kpi-icon-red">
+                <i data-lucide="alert-triangle" width="20" height="20"></i>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Hari Tidak Sehat</p>
+                <p id="kpi-pct-unhealthy" class="kpi-value kpi-value-red">—</p>
+                <p class="kpi-sub">dari total hari valid</p>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-violet">
+              <div class="kpi-icon-wrap kpi-icon-violet">
+                <i data-lucide="zap" width="20" height="20"></i>
+              </div>
+              <div class="kpi-body">
+                <p class="kpi-label">Polutan Paling Dominan</p>
+                <p id="kpi-dominant-pollutant" class="kpi-value kpi-value-violet">—</p>
+                <p class="kpi-sub" id="kpi-dominant-pct">sebagai critical polutan</p>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ══ TREND + DONUT ══ -->
+        <section id="section-trend" class="chart-row-3">
+          <!-- Trend Chart -->
+          <div class="chart-card span-2">
+            <div class="chart-card-header">
+              <div class="chart-title-group">
+                <i data-lucide="trending-up" class="chart-title-icon"></i>
+                <h3 class="chart-title">Tren Rata-rata ISPU</h3>
+              </div>
+              <div class="toggle-group">
+                <button id="btn-trend-monthly" class="trend-btn active">Bulanan</button>
+                <button id="btn-trend-yearly" class="trend-btn">Tahunan</button>
+              </div>
+            </div>
+            <div class="chart-container" style="height:300px;">
+              <canvas id="chart-trend"></canvas>
+            </div>
+          </div>
+          <!-- Category Donut -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div class="chart-title-group">
+                <i data-lucide="pie-chart" class="chart-title-icon"></i>
+                <h3 class="chart-title">Distribusi Kategori</h3>
+              </div>
+            </div>
+            <div class="chart-container donut-wrap" style="height:220px;">
+              <canvas id="chart-category"></canvas>
+            </div>
+            <div id="legend-category" class="donut-legend"></div>
+          </div>
+        </section>
+
+        <!-- ══ CRITICAL + POLLUTANT ══ -->
+        <section id="section-charts2" class="chart-row-2">
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div class="chart-title-group">
+                <i data-lucide="bar-chart-horizontal" class="chart-title-icon"></i>
+                <h3 class="chart-title">Frekuensi Polutan Kritis</h3>
+              </div>
+            </div>
+            <div class="chart-container" style="height:280px;">
+              <canvas id="chart-critical"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div class="chart-title-group">
+                <i data-lucide="flask-conical" class="chart-title-icon"></i>
+                <h3 class="chart-title">Rata-rata Konsentrasi Polutan</h3>
+              </div>
+            </div>
+            <div class="pm25-note-bar" id="pm25-note">
+              <i data-lucide="info" width="13" height="13" class="flex-shrink-0"></i>
+              <span>Data PM2.5 baru tersedia mulai pertengahan 2021.</span>
+            </div>
+            <div class="chart-container" style="height:255px;">
+              <canvas id="chart-pollutants"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══ TOP 10 TABLE ══ -->
+        <section id="section-table" class="chart-card">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <i data-lucide="list-ordered" class="chart-title-icon"></i>
+              <h3 class="chart-title">Top 10 Hari Polusi Tertinggi</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tanggal</th>
+                  <th>ISPU Maks</th>
+                  <th>Polutan Kritis</th>
+                  <th>Kategori</th>
+                  <th>PM2.5</th>
+                  <th>PM10</th>
+                  <th>O3</th>
+                  <th>CO</th>
+                  <th>SO2</th>
+                </tr>
+              </thead>
+              <tbody id="table-top10">
+                <tr><td colspan="10" class="table-empty">Memuat data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ══ INSIGHT PANEL ══ -->
+        <section id="section-insight" class="insight-panel">
+          <div class="insight-header">
+            <div class="insight-icon-wrap">
+              <i data-lucide="brain-circuit" width="18" height="18"></i>
+            </div>
+            <div>
+              <h2 class="insight-title">Automated Insight &amp; Rekomendasi</h2>
+              <p class="insight-sub">Diperbarui otomatis setiap filter berubah</p>
+            </div>
+          </div>
+          <div id="insight-content" class="insight-body">
+            <p class="insight-placeholder">Memuat insight…</p>
+          </div>
+        </section>
+
+      </main><!-- /page-body -->
+
+      <footer class="page-footer">
+        <span>Data ISPU Harian · Stasiun DKI1 Bunderan HI</span>
+        <span class="footer-sep">·</span>
+        <span>Visualisasi: Chart.js</span>
+        <span class="footer-sep">·</span>
+        <span>Parsing: PapaParse</span>
+      </footer>
+
+    </div><!-- /main-content -->
+  </div><!-- /dashboard-layout -->
+
+  <script src="script.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
